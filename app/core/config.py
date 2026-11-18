@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     app_env: str = Field(default="dev", validation_alias="APP_ENV")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     root_path: str = Field(default="", validation_alias="ROOT_PATH")
+    # Mount toàn bộ API dưới prefix khi chia chung domain với service khác qua ingress (vd. hrmapi.digigov.vn/agent).
+    # Health luôn có ở cả /health và {prefix}/health (probe k8s gọi trực tiếp pod).
+    path_prefix: str = Field(default="", validation_alias="PATH_PREFIX")
+
+    @property
+    def prefix(self) -> str:
+        p = (self.path_prefix or "").strip().rstrip("/")
+        return p if not p or p.startswith("/") else f"/{p}"
 
     # Postgres: postgresql+psycopg2://user:pass@postgres:5432/agent_db ; dev/test: sqlite
     db_url: str = Field(default="sqlite:///./agent.db", validation_alias="DB_URL")

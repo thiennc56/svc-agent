@@ -32,6 +32,7 @@ svc-hrm local trỏ tới: `AGENT_URL=http://127.0.0.1:8100 AGENT_SERVICE_TOKEN=
 | `DB_URL` | Postgres `agent_db` (dev: sqlite) |
 | `SERVICE_TOKENS` | `{"hrm": "<token>"}` – app được gọi; token cũng gửi kèm khi gọi MCP của app (`X-Agent-Token`) |
 | `MCP_SERVERS` | Allowlist `{"key": {"url", "title", "apps", "icon", "color", "description"}}` |
+| `PATH_PREFIX` | Mount API dưới prefix (prod: `/agent` → https://hrmapi.digigov.vn/agent, chung ingress host với svc-hrm) |
 | `LLM_TIMEOUT_SECONDS` / `MCP_TIMEOUT_SECONDS` / `TOOLS_CACHE_SECONDS` | Timeout / cache tools/list theo người dùng |
 
 ## Docker / k8s
