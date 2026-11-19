@@ -7,13 +7,13 @@ Kênh chat → AI Agent (prompt + định tuyến từ khoá của app) → Tr�
 """
 from __future__ import annotations
 
-from app.core.config import settings
 from app.flows.catalog import FORMAT
+from app.sources import registry
 
 
 def default_mcp_server(app: str) -> str:
     """MCP server mặc định của app: server trùng tên app, hoặc server đầu tiên khai báo app đó."""
-    servers = settings.mcp_servers
+    servers = registry.all_servers()
     if app in servers:
         return app
     for key, meta in servers.items():
@@ -24,7 +24,7 @@ def default_mcp_server(app: str) -> str:
 
 def default_flow(app: str) -> dict:
     server = default_mcp_server(app)
-    title = (settings.mcp_servers.get(server) or {}).get("title") or server.upper() or "Nguồn dữ liệu"
+    title = (registry.get(server) or {}).get("title") or server.upper() or "Nguồn dữ liệu"
     return {
         "format": FORMAT,
         "name": "Trợ lý mặc định",

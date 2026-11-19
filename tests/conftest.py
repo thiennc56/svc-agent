@@ -14,6 +14,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.db import Base, engine  # noqa: E402
 import app.flows.models  # noqa: E402,F401
+import app.sources.models  # noqa: E402,F401
+from app.sources import registry  # noqa: E402
 
 HEADERS = {
     "X-Service-Token": "tok-hrm",
@@ -27,8 +29,10 @@ HEADERS = {
 @pytest.fixture(autouse=True)
 def _db():
     Base.metadata.create_all(engine)
+    registry.invalidate()
     yield
     Base.metadata.drop_all(engine)
+    registry.invalidate()
 
 
 @pytest.fixture

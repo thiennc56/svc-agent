@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     # Nguồn không có ở đây dùng token của app gọi (SERVICE_TOKENS[app]) – tương thích svc-hrm hiện tại.
     # Bắt buộc với phân hệ ngoài HRM: không bao giờ để phân hệ A nhận token dùng để gọi phân hệ B.
     mcp_tokens: dict[str, str] = Field(default_factory=dict, validation_alias="MCP_TOKENS")
+    # Nguồn MCP động (màn "Nguồn MCP" trong HRM): host URL được phép (fnmatch, chống SSRF). IP link-local/metadata luôn bị chặn.
+    mcp_allowed_hosts: list[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "*.svc.cluster.local", "*.svc", "svc-*"],
+        validation_alias="MCP_ALLOWED_HOSTS")
+    # Khoá mã hoá token nguồn MCP lưu DB (Fernet, dẫn xuất SHA-256). Production BẮT BUỘC (k8s Secret); dev có khoá mặc định.
+    credential_key: str = Field(default="", validation_alias="CREDENTIAL_KEY")
 
     llm_timeout_seconds: float = Field(default=120.0, ge=1, validation_alias="LLM_TIMEOUT_SECONDS")
     mcp_timeout_seconds: float = Field(default=20.0, ge=1, validation_alias="MCP_TIMEOUT_SECONDS")

@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from app.core.config import settings
 from app.flows.catalog import KINDS, LLM_KINDS, defaults_for, port
 from app.flows.schema import FlowDocument
+from app.sources import registry
 
 GROQ_KEY_PREFIX = "gsk_"
 
@@ -201,7 +202,7 @@ def _sources(g: Graph, agent, app: str, res: CompileResult) -> list[ToolSource]:
         if not server:
             res.errors.append(Issue("error", "missing_field", "Nguồn MCP: chưa chọn máy chủ", node=t.id))
             continue
-        meta = settings.mcp_servers.get(server)
+        meta = registry.get(server)
         if meta is None:
             res.errors.append(Issue("error", "unknown_server", f"Máy chủ MCP '{server}' không có trong danh sách cho phép của svc-agent", node=t.id))
             continue

@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import settings
 from app.core.db import Base
 import app.flows.models  # noqa: F401  (đăng ký bảng)
+import app.sources.models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.db_url.replace("%", "%%"))

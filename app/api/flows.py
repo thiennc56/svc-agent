@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.schemas import SaveFlowRequest, ValidateRequest
-from app.core.config import settings
 from app.core.db import get_db
 from app.core.security import UserAuth, actor, require_app, user_auth
 from app.flows.catalog import public_catalog
@@ -15,16 +14,14 @@ from app.flows.compiler import compile_flow
 from app.flows.defaults import default_flow
 from app.flows.service import FlowService, mask_secrets, merge_secrets
 from app.runtime.mcp_client import McpError, list_tools, ping
+from app.sources import registry as sources_registry
 
 router = APIRouter(prefix="/v1/apps/{app}", tags=["Flows"])
 
 
 def _servers_for(app: str) -> list[dict]:
     out = []
-    for key, meta in settings.mcp_servers.items():
-        apps = meta.get("apps") or []
-        if apps and app not in apps:
-            continue
+    for key, meta in sources_registry.servers_for(app).items():
         out.append({"key": key, "title": meta.get("title") or key, "description": meta.get("description") or "",
                     "icon": meta.get("icon") or "pi pi-database", "color": meta.get("color") or "#2563eb"})
     return out

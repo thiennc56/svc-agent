@@ -17,6 +17,8 @@ import httpx
 
 from app.core.config import settings
 from app.core.security import UserAuth, service_token_for
+from app.sources import registry
+from app.sources.crypto import decrypt
 
 logger = logging.getLogger(__name__)
 PROTOCOL_VERSION = "2025-06-18"
@@ -47,12 +49,16 @@ class McpTool:
 
 
 def agent_token_for(server: str, app: str) -> str:
-    """X-Agent-Token gửi tới MCP server: token riêng của nguồn (MCP_TOKENS) nếu có, không thì token của app."""
-    return settings.mcp_tokens.get(server) or service_token_for(app)
+    """X-Agent-Token gửi tới MCP server: token riêng của nguồn (MCP_TOKENS / token mã hoá trong DB) nếu có,
+    không thì token của app (tương thích svc-hrm)."""
+    if settings.mcp_tokens.get(server):
+        return settings.mcp_tokens[server]
+    meta = registry.get(server) or {}
+    return decrypt(meta.get("token_enc")) or service_token_for(app)
 
 
 def server_meta(server: str) -> dict:
-    meta = settings.mcp_servers.get(server)
+    meta = registry.get(server)
     if meta is None:
         raise McpError(f"MCP server '{server}' không có trong danh sách cho phép")
     return meta
@@ -63,6 +69,9 @@ async def _rpc(server: str, app: str, auth: UserAuth, method: str, params: dict 
     url = meta.get("url")
     if not url:
         raise McpError(f"MCP server '{server}' chưa khai báo url")
+    if meta.get("source") == "db" and (reason := registry.check_url(url)):  # nguồn động: kiểm lại allowlist mỗi lần gọi
+        raise McpError(f"MCP '{server}': {reason}")
+    timeout = float(meta.get("timeout") or settings.mcp_timeout_seconds)
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
@@ -74,7 +83,7 @@ async def _rpc(server: str, app: str, auth: UserAuth, method: str, params: dict 
     }
     body = {"jsonrpc": "2.0", "id": next(_ids), "method": method, "params": params or {}}
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(settings.mcp_timeout_seconds, connect=5.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=5.0), follow_redirects=False) as client:
             resp = await client.post(url, json=body, headers=headers)
     except httpx.HTTPError as exc:
         raise McpError(f"Không kết nối được MCP '{server}': {type(exc).__name__}") from exc

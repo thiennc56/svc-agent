@@ -3,9 +3,10 @@ import logging
 from fastapi import APIRouter, FastAPI
 from sqlalchemy import text
 
-from app.api import chat, flows
+from app.api import chat, flows, sources
 from app.core.config import VERSION, settings
 from app.core.db import engine
+from app.sources import registry
 
 logging.basicConfig(level=settings.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 app.include_router(chat.router, prefix=PREFIX)
 app.include_router(flows.router, prefix=PREFIX)
+app.include_router(sources.router, prefix=PREFIX)
 
 health = APIRouter(tags=["Health"])
 
@@ -42,7 +44,7 @@ def ready():
         checks["database"] = "ok"
     except Exception as exc:  # noqa: BLE001
         checks["database"] = f"error: {type(exc).__name__}"
-    checks["mcpServers"] = sorted(settings.mcp_servers)
+    checks["mcpServers"] = sorted(registry.all_servers())
     checks["apps"] = sorted(settings.service_tokens)
     ok = checks["database"] == "ok"
     return {"status": "ok" if ok else "degraded", "checks": checks}
