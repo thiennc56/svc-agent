@@ -40,6 +40,7 @@ class RunContext:
     role: str = "người dùng"
     app_prompt: str = ""  # prompt mặc định do app gửi (flow để trống systemPrompt)
     link_labels: dict = field(default_factory=dict)
+    channel: str = ""  # web | mobile | test | workflow – ghi audit
 
 
 def render_prompt(template: str, ctx: RunContext) -> str:

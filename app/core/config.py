@@ -48,6 +48,12 @@ class Settings(BaseSettings):
         validation_alias="MCP_ALLOWED_HOSTS")
     # Khoá mã hoá token nguồn MCP lưu DB (Fernet, dẫn xuất SHA-256). Production BẮT BUỘC (k8s Secret); dev có khoá mặc định.
     credential_key: str = Field(default="", validation_alias="CREDENTIAL_KEY")
+    # signed_context (giai đoạn C): khoá RSA ký JWT ngữ cảnh gửi phân hệ (PEM, k8s Secret) + issuer công khai
+    agent_signing_key: str = Field(default="", validation_alias="AGENT_SIGNING_KEY")
+    agent_issuer: str = Field(default="http://127.0.0.1:8100", validation_alias="AGENT_ISSUER")
+    context_ttl_seconds: int = Field(default=120, ge=30, le=600, validation_alias="CONTEXT_TTL_SECONDS")
+    # Nhật ký gọi công cụ (audit): giữ N ngày
+    audit_retention_days: int = Field(default=90, ge=1, le=3650, validation_alias="AUDIT_RETENTION_DAYS")
 
     llm_timeout_seconds: float = Field(default=120.0, ge=1, validation_alias="LLM_TIMEOUT_SECONDS")
     mcp_timeout_seconds: float = Field(default=20.0, ge=1, validation_alias="MCP_TIMEOUT_SECONDS")

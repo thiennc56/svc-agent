@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, FastAPI
 from sqlalchemy import text
 
-from app.api import chat, flows, sources
+from app.api import chat, flows, identity, sources
 from app.core.config import VERSION, settings
 from app.core.db import engine
 from app.sources import registry
@@ -26,6 +26,11 @@ app = FastAPI(
 app.include_router(chat.router, prefix=PREFIX)
 app.include_router(flows.router, prefix=PREFIX)
 app.include_router(sources.router, prefix=PREFIX)
+app.include_router(identity.router, prefix=PREFIX)
+# JWKS ở gốc (gọi nội bộ cụm http://svc-agent:8000/.well-known/jwks.json) và dưới prefix (qua ingress /agent/...)
+app.include_router(identity.public)
+if PREFIX:
+    app.include_router(identity.public, prefix=PREFIX)
 
 health = APIRouter(tags=["Health"])
 

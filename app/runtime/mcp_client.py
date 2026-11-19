@@ -1,10 +1,13 @@
 """Client MCP (Model Context Protocol) qua HTTP JSON-RPC 2.0 (transport "streamable HTTP", phản hồi JSON).
 
 Mỗi request gửi kèm:
-  Authorization: <JWT người hỏi>   → phân hệ kiểm RBAC như REST API của nó
-  tenant-id:     <tenant>
-  X-Agent-Token: <token riêng của nguồn (MCP_TOKENS) | token của app> → phân hệ chỉ nhận lời gọi từ svc-agent
-Chỉ gọi server trong allowlist MCP_SERVERS (theo key), không bao giờ gọi URL do người dùng nhập.
+  X-Agent-Context: <JWT RS256 svc-agent ký, 120 s, aud=<mã nguồn>> – ai đang hỏi (sub, email, tenant, act=user|service,
+                   permissions mcp:<nguồn>:*). Phân hệ verify qua JWKS {AGENT_ISSUER}/.well-known/jwks.json
+  Authorization:   <JWT SOPBase người hỏi> – chỉ khi nguồn bật forward_user_jwt và người hỏi là người dùng (không phải bot)
+  tenant-id:       <tenant>
+  X-Agent-Token:   <token riêng của nguồn | token của app> → phân hệ chỉ nhận lời gọi từ svc-agent
+Giai đoạn C: nguồn require_grant → chỉ công cụ có quyền mcp:<nguồn>:<công cụ> (HRM) mới được liệt kê / gọi.
+Chỉ gọi server trong registry (ConfigMap + nguồn khai báo trên HRM), không bao giờ gọi URL do người dùng nhập.
 """
 from __future__ import annotations
 
@@ -16,7 +19,9 @@ from dataclasses import dataclass, field
 import httpx
 
 from app.core.config import settings
+from app.core import perms as P
 from app.core.security import UserAuth, service_token_for
+from app.core.signing import SigningKeyMissing, sign_context
 from app.sources import registry
 from app.sources.crypto import decrypt
 
@@ -76,11 +81,21 @@ async def _rpc(server: str, app: str, auth: UserAuth, method: str, params: dict 
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
         "MCP-Protocol-Version": PROTOCOL_VERSION,
-        "Authorization": auth.authorization,
         "tenant-id": auth.tenant_id,
         "X-Agent-Token": agent_token_for(server, app),
         "X-Agent-App": app,
     }
+    # JWT SOPBase của người hỏi: chỉ nguồn còn bật "chuyển tiếp JWT" (mặc định, tương thích hướng dẫn v1.1).
+    # Bot (kind=service) không có JWT người dùng → chỉ dùng signed_context.
+    if meta.get("forward_user_jwt", True) and auth.kind == "user":
+        headers["Authorization"] = auth.authorization
+    try:  # signed_context: ai đang hỏi, ký bởi svc-agent, aud = mã nguồn (phân hệ verify qua JWKS)
+        headers["X-Agent-Context"] = sign_context(server, sub=auth.user_id, email=auth.email, tenant=auth.tenant_id,
+                                                  app=app, act=auth.kind, name=auth.name, permissions=auth.permissions)
+    except SigningKeyMissing as exc:
+        logger.error("signed_context: %s", exc)
+    if "Authorization" not in headers and "X-Agent-Context" not in headers:
+        raise McpError(f"MCP '{server}': không có danh tính người hỏi để gửi (thiếu AGENT_SIGNING_KEY)")
     body = {"jsonrpc": "2.0", "id": next(_ids), "method": method, "params": params or {}}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout, connect=5.0), follow_redirects=False) as client:
@@ -100,32 +115,59 @@ async def _rpc(server: str, app: str, auth: UserAuth, method: str, params: dict 
     return data.get("result") or {}
 
 
-async def list_tools(server: str, app: str, auth: UserAuth, use_cache: bool = True) -> list[McpTool]:
-    """tools/list đã được phân hệ lọc theo quyền người hỏi → cache theo người dùng."""
-    key = (server, app, auth.tenant_id, auth.user_id or auth.email or auth.authorization[-24:])
+def requires_grant(server: str) -> bool:
+    """Nguồn yêu cầu quyền mcp:<nguồn>:<công cụ> từ HRM (lớp 1). Nguồn hạ tầng ConfigMap (vd. hrm) tự kiểm quyền → False."""
+    return bool((registry.get(server) or {}).get("require_grant", False))
+
+
+def tool_allowed(server: str, tool: str, auth: UserAuth) -> bool:
+    return not requires_grant(server) or P.can_use_tool(auth.permissions, server, tool)
+
+
+async def list_tools(server: str, app: str, auth: UserAuth, use_cache: bool = True,
+                     filter_grants: bool = True) -> list[McpTool]:
+    """tools/list (phân hệ đã lọc theo quyền của nó – lớp 2) → lọc thêm theo quyền mcp:* của HRM (lớp 1). Cache theo người."""
+    if filter_grants and requires_grant(server) and not P.can_use_source(auth.permissions, server):
+        return []  # không có quyền nào với nguồn → không gọi phân hệ
+    key = (server, app, auth.tenant_id, auth.user_id or auth.email or auth.authorization[-24:], auth.kind)
     now = time.monotonic()
     hit = _cache.get(key)
     if use_cache and hit and now - hit[0] < settings.tools_cache_seconds:
-        return hit[1]
-    result = await _rpc(server, app, auth, "tools/list")
-    tools = [
-        McpTool(server, t.get("name", ""), t.get("description") or t.get("title") or "", t.get("inputSchema") or {},
-                {**(t.get("x-dns") or {}), "title": t.get("title") or (t.get("x-dns") or {}).get("title") or t.get("name")})
-        for t in result.get("tools") or [] if t.get("name")
-    ]
-    if len(_cache) > 2000:
-        _cache.clear()
-    _cache[key] = (now, tools)
-    return tools
+        tools = hit[1]
+    else:
+        result = await _rpc(server, app, auth, "tools/list")
+        tools = [
+            McpTool(server, t.get("name", ""), t.get("description") or t.get("title") or "", t.get("inputSchema") or {},
+                    {**(t.get("x-dns") or {}), "title": t.get("title") or (t.get("x-dns") or {}).get("title") or t.get("name")})
+            for t in result.get("tools") or [] if t.get("name")
+        ]
+        if len(_cache) > 2000:
+            _cache.clear()
+        _cache[key] = (now, tools)
+    return [t for t in tools if tool_allowed(server, t.name, auth)] if filter_grants else tools
 
 
-async def call_tool(server: str, app: str, auth: UserAuth, name: str, arguments: dict) -> dict:
-    """tools/call → dict kết quả (structuredContent nếu có, không thì text JSON). Lỗi → {"error": ...}."""
+async def call_tool(server: str, app: str, auth: UserAuth, name: str, arguments: dict, channel: str = "") -> dict:
+    """tools/call → dict kết quả (structuredContent nếu có, không thì text JSON). Lỗi → {"error": ...}. Luôn ghi audit."""
+    from app.sources import audit
+
+    started = time.perf_counter()
+
+    def log(status: str, error: str | None = None) -> None:
+        audit.record(app=app, auth=auth, server=server, tool=name, status=status, error=error, channel=channel,
+                     duration_ms=int((time.perf_counter() - started) * 1000))
+
+    if not tool_allowed(server, name, auth):  # kiểm lại lúc gọi (không tin danh sách đã lọc / model)
+        log("denied", "no_grant")
+        return {"error": "not_permitted", "message": "Bạn chưa được cấp quyền dùng công cụ này (Phân quyền vai trò → Trợ lý AI)."}
     try:
         result = await _rpc(server, app, auth, "tools/call", {"name": name, "arguments": arguments or {}})
     except McpError as exc:
         logger.warning("mcp call failed server=%s tool=%s: %s", server, name, exc)
+        log("error", "unavailable")
         return {"error": "unavailable", "message": str(exc)[:200]}
+    log("error" if result.get("isError") else "ok",
+        (result.get("structuredContent") or {}).get("error") if result.get("isError") and isinstance(result.get("structuredContent"), dict) else None)
     if isinstance(result.get("structuredContent"), dict):
         data = result["structuredContent"]
     else:

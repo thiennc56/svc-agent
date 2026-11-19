@@ -50,7 +50,7 @@ class Agent:
             return {"error": "not_permitted_or_unknown_tool"}
         props = (tool.input_schema or {}).get("properties") or {}
         args = {k: v for k, v in (args or {}).items() if k in props}
-        result = await call_tool(tool.server, self.ctx.app, self.ctx.auth, name, args)
+        result = await call_tool(tool.server, self.ctx.app, self.ctx.auth, name, args, channel=self.ctx.channel)
         if self.plan.include_links:
             collect_links(result, self.links, self.ctx.link_labels, self.plan.max_links)
         return result

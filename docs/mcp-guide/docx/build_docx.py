@@ -18,10 +18,13 @@ import c7_security
 import c8_appendix
 from docx_helpers import Doc
 
-VERSION = "1.1"
-DATE = "19/11/2026"
+VERSION = "1.2"
+DATE = "20/11/2026"
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / f"DNS_Huong_dan_phat_trien_MCP_server_v{VERSION}.docx"
 CHANGELOG = [
+    ("1.2", "20/11/2026", "signed_context: header X-Agent-Context (JWT RS256 svc-agent ký, aud = mã nguồn, có bot act=service) – "
+                          "khuyến nghị thay JWT SOPBase (§4.6, mẫu agent_context.py). Quyền mcp:* trong HRM + Nhật ký gọi công cụ (§4.7). "
+                          "v1.1 vẫn chạy (tương thích)."),
     ("1.1", "19/11/2026", "Đăng ký nguồn trên HRM (tab Nguồn MCP): token tự sinh, hiển thị 1 lần, Test kết nối, Kiểm tra chuẩn, "
                           "hiệu lực ngay – thay quy trình sửa ConfigMap. URL nội bộ theo danh sách host cho phép. "
                           "Làm rõ tài khoản đăng nhập nội bộ (hrm-local) không dùng được với phân hệ. "

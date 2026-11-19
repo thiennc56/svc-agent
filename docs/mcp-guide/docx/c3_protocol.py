@@ -15,7 +15,8 @@ def build(doc: Doc) -> None:
     ], [3.0, 14.0], 9)
     doc.h("5.2 Header svc-agent gửi", 2)
     doc.table(["Header", "Ví dụ", "Ghi chú"], [
-        ["`Authorization`", "`Bearer eyJhbGciOiJSUzI1NiIs…`", "JWT SOPBase của người hỏi – bắt buộc verify."],
+        ["`X-Agent-Context`", "`eyJhbGciOiJSUzI1NiIs…`", "**v1.2 – khuyến nghị verify**: JWT svc-agent ký, aud = mã nguồn (§4.6). Luôn có."],
+        ["`Authorization`", "`Bearer eyJhbGciOiJSUzI1NiIs…`", "JWT SOPBase người hỏi (v1.1) – chỉ khi nguồn bật “Gửi kèm JWT”; bot không có."],
         ["`tenant-id`", "`00000000-0000-0000-0000-000000000010`", "UUID tenant."],
         ["`X-Agent-Token`", "`k3J…(48 ký tự)`", "Token riêng của nguồn."],
         ["`X-Agent-App`", "`hrm`", "Ứng dụng chat đang gọi (thông tin, ghi log)."],

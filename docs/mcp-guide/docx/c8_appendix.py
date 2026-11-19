@@ -11,7 +11,9 @@ svc-agent/docs/mcp-guide/
 │   ├── mcp_server.py           xác thực 2 lớp, JSON-RPC, /mcp
 │   ├── crm_tools.py            công cụ + RBAC demo + x-dns
 │   ├── schema_check.py         kiểm arguments theo inputSchema
-│   ├── test_mcp_server.py      26 ca test (không cần mạng)
+│   ├── agent_context.py        verify X-Agent-Context (signed_context, v1.2)
+│   ├── test_mcp_server.py      26 ca test JWT SOPBase (không cần mạng)
+│   ├── test_agent_context.py   8 ca test signed_context (người dùng + bot)
 │   └── requirements.txt
 ├── samples/node-express/       MCP server Kho mẫu (Express 5 + jose)
 ├── tools/mcp_check.py          kiểm tra chuẩn server đang chạy

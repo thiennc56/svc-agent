@@ -33,6 +33,10 @@ class SourceIn(BaseModel):
     apps: list[str] = Field(default_factory=list, max_length=20)
     enabled: bool = True
     timeoutSeconds: int = Field(default=20, ge=2, le=60)
+    # Giai đoạn C: chỉ hiện công cụ được cấp quyền mcp:<key>:<tool> trong HRM (khuyến nghị bật)
+    requireGrant: bool = True
+    # Chuyển tiếp JWT SOPBase người hỏi (tương thích phân hệ làm theo hướng dẫn v1.1). Tắt khi phân hệ đã verify X-Agent-Context.
+    forwardUserJwt: bool = True
 
 
 class SourceCreate(SourceIn):
@@ -47,6 +51,7 @@ def _public(s: AgentMcpSource | None, key: str, meta: dict) -> dict:
         "apps": list(meta.get("apps") or []), "enabled": bool(meta.get("enabled", True)),
         "timeoutSeconds": int(meta.get("timeout") or settings.mcp_timeout_seconds),
         "source": meta.get("source", "db"), "editable": meta.get("source") == "db",
+        "requireGrant": bool(meta.get("require_grant", False)), "forwardUserJwt": bool(meta.get("forward_user_jwt", True)),
         "hasToken": bool(s and s.token_enc) or key in settings.mcp_tokens,
         "tokenHint": (s.token_hint if s else None), "updatedBy": s.updated_by if s else None,
         "updatedAt": s.updated_at.isoformat() if s and s.updated_at else None,
@@ -95,6 +100,7 @@ def create_source(body: SourceCreate, app: str = Depends(require_app), who: str 
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     row = AgentMcpSource(key=body.key, title=body.title, description=body.description, icon=body.icon, color=body.color,
                          url=body.url.strip(), apps=body.apps, enabled=body.enabled, timeout_seconds=body.timeoutSeconds,
+                         require_grant=body.requireGrant, forward_user_jwt=body.forwardUserJwt,
                          token_enc=enc, token_hint=token[-4:], created_by=who, updated_by=who)
     db.add(row)
     db.commit()
@@ -108,6 +114,7 @@ def update_source(key: str, body: SourceIn, app: str = Depends(require_app), who
     row = _row(db, key)
     row.title, row.description, row.icon, row.color = body.title, body.description, body.icon, body.color
     row.url, row.apps, row.enabled, row.timeout_seconds = body.url.strip(), body.apps, body.enabled, body.timeoutSeconds
+    row.require_grant, row.forward_user_jwt = body.requireGrant, body.forwardUserJwt
     row.updated_by = who
     db.commit()
     _changed()
@@ -143,7 +150,7 @@ async def test_source(key: str, app: str = Depends(require_app), auth: UserAuth 
     started = time.perf_counter()
     try:
         info = await mcp_client.ping(key, app, auth)
-        tools = await mcp_client.list_tools(key, app, auth, use_cache=False)
+        tools = await mcp_client.list_tools(key, app, auth, use_cache=False, filter_grants=False)
     except mcp_client.McpError as exc:
         return {"ok": False, "error": str(exc), "latencyMs": int((time.perf_counter() - started) * 1000)}
     return {"ok": True, "latencyMs": info.get("latencyMs"), "serverInfo": info.get("serverInfo"), "toolCount": len(tools),
@@ -160,4 +167,25 @@ async def check_source(key: str, app: str = Depends(require_app), auth: UserAuth
         return {"ok": False, "pass": 0, "warn": 0, "fail": 1, "tools": 0, "items": [{"level": "fail", "check": "URL", "detail": reason}]}
     token = settings.mcp_tokens.get(key) or decrypt(meta.get("token_enc")) or service_token_for(app)
     return await run_check(meta["url"], token, auth, float(meta.get("timeout") or settings.mcp_timeout_seconds))
+
+
+
+@router.get("/tool-catalog")
+async def tool_catalog(app: str = Depends(require_app), auth: UserAuth = Depends(user_auth)):
+    """Danh mục công cụ của các nguồn cần cấp quyền (require_grant) → HRM sinh nhóm quyền mcp:<nguồn>:<công cụ>
+    trong màn Phân quyền vai trò. Gọi bằng danh tính người quản trị, KHÔNG lọc theo quyền mcp:* (để cấp được)."""
+    import asyncio
+
+    servers = {k: m for k, m in registry.servers_for(app).items() if m.get("require_grant")}
+
+    async def one(key: str, meta: dict) -> dict:
+        try:
+            tools = await mcp_client.list_tools(key, app, auth, use_cache=True, filter_grants=False)
+            return {"key": key, "title": meta.get("title") or key, "status": "ok",
+                    "tools": [{"name": t.name, "title": t.meta.get("title") or t.name, "group": t.meta.get("group") or "",
+                               "description": t.description[:200]} for t in tools]}
+        except mcp_client.McpError as exc:
+            return {"key": key, "title": meta.get("title") or key, "status": "error", "error": str(exc)[:200], "tools": []}
+
+    return {"sources": list(await asyncio.gather(*(one(k, m) for k, m in sorted(servers.items()))))}
 

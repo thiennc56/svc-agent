@@ -1,6 +1,7 @@
 # Bộ hướng dẫn phát triển MCP server cho phân hệ DNS
 
-Tài liệu chính: **`DNS_Huong_dan_phat_trien_MCP_server_v1.1.docx`** (gửi cho đội CRM, Kho, Dự án, Bán hàng…).
+Tài liệu chính: **`DNS_Huong_dan_phat_trien_MCP_server_v1.2.docx`** (gửi cho đội CRM, Kho, Dự án, Bán hàng…).
+v1.2: khuyến nghị verify header `X-Agent-Context` (signed_context – mẫu `samples/python-fastapi/agent_context.py`); cách v1.1 (JWT SOPBase) vẫn chạy.
 
 Gửi cho đội phân hệ: **nén cả thư mục `mcp-guide/`** (DOCX + `samples/` + `tools/`) – không cần `docx/` (mã sinh tài liệu).
 `OIDC_ACCEPTED_AUDIENCES` (production) = `E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg` (client_id web + mobile HRM – công khai, đã ghi trong tài liệu §4.2).

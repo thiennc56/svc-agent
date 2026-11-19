@@ -27,6 +27,7 @@ from authlib.jose.errors import JoseError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
+import agent_context
 from crm_tools import TOOL_BY_NAME, Ctx, allowed_tools, load_context
 from schema_check import validate_args
 
@@ -193,14 +194,23 @@ async def mcp_endpoint(request: Request):
         return _http_error(503, "mcp_disabled", "MCP chưa bật (thiếu MCP_AGENT_TOKEN)")
     if not hmac.compare_digest(expected.encode(), given.encode()):
         return _http_error(401, "invalid_agent_token", "X-Agent-Token không hợp lệ")
-    # 2) Người hỏi (JWT SOPBase)
-    try:
-        claims = await verify_user_jwt(request.headers.get("Authorization"))
-    except AuthError as exc:
-        logger.warning("mcp auth failed: %s", exc)  # KHÔNG log token
-        return _http_error(401, "invalid_token", "Token người dùng không hợp lệ hoặc hết hạn")
-    # 3) Tenant – người dùng phải là thành viên
+    # 2) Người hỏi: ưu tiên X-Agent-Context (signed_context, v1.2 – có cả bot); không cấu hình → JWT SOPBase (v1.1)
     tenant = (request.headers.get("tenant-id") or "").strip()
+    if agent_context.configured():
+        try:
+            claims = await agent_context.verify(request.headers.get("X-Agent-Context"))
+        except agent_context.ContextError as exc:
+            logger.warning("mcp context failed: %s", exc)  # KHÔNG log token
+            return _http_error(401, "invalid_token", "Ngữ cảnh người hỏi không hợp lệ hoặc hết hạn")
+        if claims.get("tenant") != tenant:  # tenant trong JWT đã ký thắng header
+            return _http_error(403, "forbidden", "tenant-id không khớp ngữ cảnh đã ký")
+    else:
+        try:
+            claims = await verify_user_jwt(request.headers.get("Authorization"))
+        except AuthError as exc:
+            logger.warning("mcp auth failed: %s", exc)  # KHÔNG log token
+            return _http_error(401, "invalid_token", "Token người dùng không hợp lệ hoặc hết hạn")
+    # 3) Tenant – người dùng / bot phải là thành viên
     if not tenant or len(tenant) > 64:
         return _http_error(400, "tenant_required", "Thiếu header tenant-id")
     ctx = load_context(claims, tenant)

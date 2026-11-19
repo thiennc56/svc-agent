@@ -53,7 +53,7 @@ async def chat(body: AgentChatRequest, app: str = Depends(require_app), auth: Us
     targets = model_targets(plan.models, llm)
     tools, limits, problems = await resolve_tools(plan, app, auth)
     ctx = RunContext(app=app, auth=auth, user=body.context.user, role=body.context.role,
-                     app_prompt=body.context.systemPrompt, link_labels=body.context.linkLabels)
+                     app_prompt=body.context.systemPrompt, link_labels=body.context.linkLabels, channel=body.channel or "")
     agent = Agent(plan, ctx, tools, targets, limits)
     history = [m.model_dump() for m in body.messages]
     meta = {"flowVersion": version, "draft": body.flow is not None, "sourceErrors": problems}

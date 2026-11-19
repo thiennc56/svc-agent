@@ -26,6 +26,8 @@ MEMBERS = {  # (tenant, email) → quyền trong CRM
     ("t1", "sale2@test.com"): {"crm:customers:read:own", "crm:opportunities:read:own"},
     ("t1", "manager@test.com"): {"crm:customers:read:all", "crm:opportunities:read:all"},
     ("t1", "guest@test.com"): set(),
+    # Bot tự động (act=service trong X-Agent-Context): tài khoản dịch vụ, quyền TỐI THIỂU do phân hệ cấp
+    ("t1", "bot-bao-cao@hrm.bot"): {"crm:opportunities:read:all"},
 }
 
 

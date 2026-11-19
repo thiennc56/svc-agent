@@ -84,10 +84,38 @@ OIDC_ACCEPTED_AUDIENCES=E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg,q-CEmcJOdX
     doc.h("4.5 Không chuyển tiếp token xuống dịch vụ khác", 2)
     doc.p("Chuẩn MCP cấm *token passthrough*. Phân hệ **không** gửi JWT nhận được từ `/mcp` sang API bên thứ ba hay "
           "dịch vụ khác. Nếu cần gọi dịch vụ nội bộ khác, dùng tài khoản dịch vụ của phân hệ **sau khi** đã lọc phạm vi theo người hỏi.")
-    doc.h("4.6 Lộ trình nâng cấp danh tính", 2)
-    doc.table(["Giai đoạn", "Cơ chế", "Phân hệ cần làm"], [
-        ["Hiện tại (v1.0)", "JWT SOPBase của người hỏi + `X-Agent-Token`", "Theo tài liệu này."],
-        ["Tiếp theo", "`signed_context`: svc-agent ký JWT 120 s (`aud` = key nguồn, có `sub`, `email`, `tenant`), JWKS "
-         "`https://hrmapi.digigov.vn/agent/.well-known/jwks.json`", "Thêm issuer/JWKS thứ 2 vào verify; logic phân quyền giữ nguyên."],
-        ["Khi SOPBase hỗ trợ RFC 8693", "Token exchange → token riêng `aud` = phân hệ", "Bỏ allowlist client chat; `aud` = client phân hệ như REST API."],
-    ], [3.2, 7.8, 6.0], 9)
+    doc.h("4.6 signed_context – X-Agent-Context (khuyến nghị từ v1.2)", 2)
+    doc.p("Mỗi lời gọi `/mcp`, svc-agent gửi kèm header **`X-Agent-Context`**: JWT RS256 do svc-agent ký, sống **120 giây**, "
+          "`aud` = **mã nguồn của chính phân hệ** (vd. `crm`). Phân hệ verify bằng JWKS công khai của svc-agent. Ưu điểm so với JWT SOPBase:")
+    doc.bullets([
+        "Token **chỉ dùng được cho đúng phân hệ** (aud riêng) – không thể đem token gửi CRM sang gọi Kho.",
+        "Có cả **bot tự động** (`act = service`): workflow chạy theo lịch không có người đăng nhập, không có JWT SOPBase.",
+        "Có cả người đăng nhập **tài khoản nội bộ** HRM (không qua SSO) – v1.1 không hỗ trợ.",
+        "Đúng chuẩn MCP (không chuyển tiếp token của người dùng – *no token passthrough*).",
+    ])
+    doc.table(["Claim", "Ý nghĩa"], [
+        ["`iss`", "`https://hrmapi.digigov.vn/agent` (production)"],
+        ["`aud`", "`[\"<mã nguồn>\"]` – phải bằng `MCP_SOURCE_KEY` của phân hệ"],
+        ["`sub`, `email`, `name`", "Người hỏi (người dùng) hoặc tài khoản bot. Ánh xạ người dùng theo `email` (chuẩn hoá lower)"],
+        ["`tenant`", "UUID doanh nghiệp – **phải trùng header `tenant-id`**, khác → 403"],
+        ["`act`", "`user` = người dùng chat · `service` = bot tự động (workflow)"],
+        ["`permissions`", "Quyền `mcp:<nguồn>:*` HRM đã cấp cho người hỏi (chỉ của nguồn này) – thông tin bổ sung; phân hệ **vẫn tự kiểm RBAC**"],
+        ["`iat`, `nbf`, `exp`, `jti`", "Thời hạn 120 s, mã duy nhất (có thể dùng chống phát lại)"],
+    ], [4.0, 13.0], 9)
+    doc.code("""
+AGENT_ISSUER=https://hrmapi.digigov.vn/agent
+AGENT_JWKS_URL=http://svc-agent.hrm-platform.svc.cluster.local:8000/.well-known/jwks.json   # trong cụm (hoặc https://hrmapi.digigov.vn/agent/.well-known/jwks.json)
+MCP_SOURCE_KEY=crm                                                                           # = mã nguồn trên tab Nguồn MCP
+""", "Cấu hình phân hệ (mẫu: samples/python-fastapi/agent_context.py)")
+    doc.bullets([
+        "Cấu hình đủ 3 biến trên → mẫu tự chuyển sang verify `X-Agent-Context`; chưa cấu hình → dùng JWT SOPBase như v1.1 (không phá vỡ).",
+        "Khi phân hệ đã verify `X-Agent-Context`, báo quản trị nền tảng **tắt “Gửi kèm JWT SOPBase”** của nguồn trên tab Nguồn MCP – "
+        "bắt buộc để **Bot tự động** đọc được dữ liệu phân hệ.",
+        "Bot: phân hệ tạo tài khoản dịch vụ (vd. `bot-bao-cao@hrm.bot`) với quyền **tối thiểu**, ghi rõ trong nhật ký là bot.",
+        "Khi SOPBase hỗ trợ token exchange (RFC 8693): có thể chuyển sang token SOPBase riêng `aud` = phân hệ; giao thức `/mcp` không đổi.",
+    ])
+    doc.h("4.7 Quyền mcp:* trong HRM (lớp 1) + RBAC phân hệ (lớp 2)", 2)
+    doc.p("Nguồn bật **“Yêu cầu cấp quyền trong HRM”** (mặc định khi thêm nguồn): admin doanh nghiệp vào *Phân quyền vai trò* → nhóm "
+          "**“Trợ lý AI · <tên nguồn>”** → tích từng công cụ (`mcp:crm:crm_search_customers`) hoặc **Tất cả công cụ** (`mcp:crm:*`) cho từng vai trò. "
+          "svc-agent chỉ đưa cho AI các công cụ người hỏi được cấp và **kiểm lại khi gọi**; phân hệ vẫn kiểm RBAC của mình (2 lớp). "
+          "Mọi lần gọi được ghi **Nhật ký** (Cấu hình Chatbot → Nhật ký): ai/bot, công cụ, kết quả, thời gian – không lưu dữ liệu.")

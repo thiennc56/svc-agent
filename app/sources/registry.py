@@ -28,7 +28,8 @@ def _load_db() -> dict[str, dict]:
             for s in db.query(AgentMcpSource).all():
                 out[s.key] = {"url": s.url, "title": s.title, "description": s.description, "icon": s.icon, "color": s.color,
                               "apps": list(s.apps or []), "enabled": bool(s.enabled), "timeout": s.timeout_seconds,
-                              "token_enc": s.token_enc, "source": "db"}
+                              "token_enc": s.token_enc, "source": "db", "require_grant": bool(s.require_grant),
+                              "forward_user_jwt": bool(s.forward_user_jwt)}
     except Exception as exc:  # noqa: BLE001 – bảng chưa migrate / DB lỗi: vẫn chạy với ConfigMap
         logger.warning("mcp sources: không đọc được DB (%s) – chỉ dùng MCP_SERVERS", type(exc).__name__)
     return out
@@ -50,7 +51,8 @@ def all_servers(include_disabled: bool = False) -> dict[str, dict]:
     """key → meta. ConfigMap thắng nếu trùng key (nguồn DB không được ghi đè nguồn hạ tầng)."""
     out = {k: v for k, v in _db_sources().items() if include_disabled or v.get("enabled", True)}
     for k, v in settings.mcp_servers.items():
-        out[k] = {**v, "source": "config", "enabled": True}
+        # Nguồn hạ tầng (vd. hrm): tự kiểm quyền RBAC của nó, nhận JWT người hỏi → mặc định không cần cấp mcp:*
+        out[k] = {"require_grant": False, "forward_user_jwt": True, **v, "source": "config", "enabled": True}
     return out
 
 
