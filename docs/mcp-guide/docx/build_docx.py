@@ -18,9 +18,16 @@ import c7_security
 import c8_appendix
 from docx_helpers import Doc
 
-VERSION = "1.0"
+VERSION = "1.1"
 DATE = "19/11/2026"
-DEFAULT_OUT = Path(__file__).resolve().parents[1] / "DNS_Huong_dan_phat_trien_MCP_server_v1.0.docx"
+DEFAULT_OUT = Path(__file__).resolve().parents[1] / f"DNS_Huong_dan_phat_trien_MCP_server_v{VERSION}.docx"
+CHANGELOG = [
+    ("1.1", "19/11/2026", "Đăng ký nguồn trên HRM (tab Nguồn MCP): token tự sinh, hiển thị 1 lần, Test kết nối, Kiểm tra chuẩn, "
+                          "hiệu lực ngay – thay quy trình sửa ConfigMap. URL nội bộ theo danh sách host cho phép. "
+                          "Làm rõ tài khoản đăng nhập nội bộ (hrm-local) không dùng được với phân hệ. "
+                          "Ghi giá trị OIDC_ACCEPTED_AUDIENCES thực tế (kiểm bằng đăng nhập SSO thật)."),
+    ("1.0", "19/11/2026", "Bản đầu tiên."),
+]
 
 
 def main() -> None:
@@ -35,6 +42,8 @@ def main() -> None:
                ("Đối tượng", "Lập trình viên backend, kiến trúc sư, bảo mật/DevOps các phân hệ"),
                ("Đơn vị ban hành", "Đội nền tảng DNS (svc-agent / HRM)"),
                ("Mã nguồn mẫu", "`svc-agent/docs/mcp-guide/` (Python FastAPI, Node Express, mcp_check)")])
+    doc.d.add_heading("Lịch sử thay đổi", 2)
+    doc.table(["Phiên bản", "Ngày", "Nội dung"], [list(r) for r in CHANGELOG], [2.2, 2.6, 12.2], 9)
     doc.d.add_heading("Mục lục", 1)
     doc.toc()
     doc.h("Tóm tắt cho người đọc nhanh", 1)
@@ -45,6 +54,7 @@ def main() -> None:
         "Công cụ **chỉ đọc**, kết quả gọn (≤ 20 bản ghi, ≤ 32 KB), có `x-dns` (quyền, nhóm, từ khoá, câu gợi ý) và `link` mở màn hình.",
         "`tools/list` lọc theo quyền; `tools/call` **kiểm lại quyền** + kiểm tham số theo `inputSchema`.",
         "Trước khi đăng ký: test tự động + `mcp_check.py` 0 lỗi + checklist bảo mật §10 đạt mục **Bắt buộc**.",
+        "Đăng ký: quản trị nền tảng thêm nguồn trên HRM (*Cấu hình Chatbot → Nguồn MCP*) → nhận token 1 lần → **Kiểm tra chuẩn** phải ĐẠT (§9).",
     ])
     for chapter in (c1_intro, c1b_compare, c2_auth, c3_protocol, c4_tools, c5_impl, c6_test_register, c7_security, c8_appendix):
         chapter.build(doc)

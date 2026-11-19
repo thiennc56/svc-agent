@@ -1,6 +1,10 @@
 # Bộ hướng dẫn phát triển MCP server cho phân hệ DNS
 
-Tài liệu chính: **`DNS_Huong_dan_phat_trien_MCP_server_v1.0.docx`** (gửi cho đội CRM, Kho, Dự án, Bán hàng…).
+Tài liệu chính: **`DNS_Huong_dan_phat_trien_MCP_server_v1.1.docx`** (gửi cho đội CRM, Kho, Dự án, Bán hàng…).
+
+Gửi cho đội phân hệ: **nén cả thư mục `mcp-guide/`** (DOCX + `samples/` + `tools/`) – không cần `docx/` (mã sinh tài liệu).
+`OIDC_ACCEPTED_AUDIENCES` (production) = `E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg` (client_id web + mobile HRM – công khai, đã ghi trong tài liệu §4.2).
+Gửi riêng qua kênh an toàn (KHÔNG để trong tài liệu): token `MCP_AGENT_TOKEN` – có sau khi quản trị nền tảng thêm nguồn trên HRM.
 
 | Thư mục | Nội dung |
 |---|---|

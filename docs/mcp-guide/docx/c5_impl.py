@@ -22,7 +22,7 @@ def build(doc: Doc) -> None:
 MCP_AGENT_TOKEN=<token riêng do đội nền tảng cấp, 48 ký tự>          # k8s Secret
 OIDC_ISSUER=https://sopbase.digigov.vn/auth
 OIDC_JWKS_URL=https://sopbase.digigov.vn/auth/jwks
-OIDC_ACCEPTED_AUDIENCES=<client_id web HRM>,<client_id mobile HRM>   # đội nền tảng cung cấp – KHÁC client của phân hệ
+OIDC_ACCEPTED_AUDIENCES=E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg  # web + mobile HRM (§4.2) – KHÁC client của phân hệ
 """, "svc-crm – .env / ConfigMap")
     doc.h("7.2 Python / FastAPI – xác thực người hỏi", 2)
     doc.code("""

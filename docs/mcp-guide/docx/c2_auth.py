@@ -36,13 +36,34 @@ def build(doc: Doc) -> None:
         ["3", "Cùng người dùng nhưng `sub` có thể khác giữa đăng nhập SSO và tài khoản nội bộ.",
          "Ánh xạ người dùng theo `sub` (ưu tiên) **hoặc** `email` đã xác minh, chuẩn hoá `lower()`; ghi rõ quy tắc."],
         ["4", "`tenant-id` là UUID tenant của nền tảng.", "Phân hệ dùng cùng UUID tenant, hoặc bảng ánh xạ; không thấy → 403."],
-        ["5", "Token dev/local (issuer `hrm-local`) chỉ svc-hrm hiểu.", "Phân hệ **không** chấp nhận issuer khác SOPBase ở production; dev dùng SOPBase thật hoặc JWKS giả (§7)."],
+        ["5", "HRM còn cho đăng nhập **tài khoản nội bộ** (token tiền tố `hrm-local.`, HS256, issuer `hrm-local`) – chỉ svc-hrm hiểu.",
+         "Phân hệ **không** chấp nhận token này (đúng thiết kế) → trả 401; trợ lý báo nguồn không truy cập được. Người dùng cần "
+         "**đăng nhập SSO** để tra cứu dữ liệu phân hệ. Dev: dùng SOPBase thật hoặc JWKS giả (§8). Lộ trình `signed_context` (§4.6) "
+         "sẽ hỗ trợ cả tài khoản nội bộ."],
         ["6", "Client của phân hệ có `client_secret` (client_credentials).",
          "**Không** dùng client_credentials để tra dữ liệu thay người dùng trong `/mcp` – sẽ mất phân quyền theo người."],
     ], [0.8, 6.2, 10.0], 9)
-    doc.box("Muốn biết `aud` thực tế: lấy access token từ trình duyệt (DevTools → request `/assistant/chat` → header "
-            "Authorization), giải mã phần payload (base64url) – **không dán token production lên website giải mã trực tuyến**.",
-            "info", "Mẹo")
+    doc.h("Giá trị thực tế (kiểm tra 19/11/2026 bằng đăng nhập SSO thật)", 3)
+    doc.table(["Ứng dụng chat", "client_id (= `aud` của access token)", "Dùng ở"], [
+        ["Web HRM production (hrm.digigov.vn)", "`E-yNLIGmd-EIf8yQas81Sg`", "Production"],
+        ["App mobile HRM (iOS/Android)", "`G75nADuiXfxP_mBs06cRgg`", "Production"],
+        ["Web HRM dev (localhost:4200)", "`q-CEmcJOdXDpey8DcnYmlw`", "Chỉ môi trường dev/test"],
+    ], [5.5, 6.0, 5.5], 9)
+    doc.code("""
+# Production
+OIDC_ACCEPTED_AUDIENCES=E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg
+# Dev/test (thêm client localhost)
+OIDC_ACCEPTED_AUDIENCES=E-yNLIGmd-EIf8yQas81Sg,G75nADuiXfxP_mBs06cRgg,q-CEmcJOdXDpey8DcnYmlw
+""", "Cấu hình cho /mcp của phân hệ")
+    doc.bullets([
+        "Access token SOPBase: `alg=RS256`, có `kid`; claim `aud` là **mảng** (`[\"<client_id>\"]`), có thêm `client_id`; **không có** `azp`.",
+        "Claim có sẵn: `sub`, `email`, `iss`, `exp`, `iat`, `jti`, `scope`, `permissions`, `roles`, `app_namespace`. `subject_types=public` "
+        "→ cùng người dùng có **cùng `sub`** trên mọi client.",
+        "Thời hạn access token **15 phút** – svc-agent luôn chuyển tiếp token mới nhất của người hỏi; phân hệ không cần refresh.",
+        "client_id là định danh công khai (client PKCE), không phải bí mật – có thể ghi trong ConfigMap.",
+    ])
+    doc.box("Không dán token production lên website giải mã trực tuyến; nếu cần xem claim, giải mã phần payload (base64url) trên máy.",
+            "info", "Lưu ý")
 
     doc.h("4.3 Verify JWT – yêu cầu tối thiểu", 2)
     doc.bullets([
@@ -54,8 +75,9 @@ def build(doc: Doc) -> None:
     ])
     doc.h("4.4 X-Agent-Token", 2)
     doc.bullets([
-        "Mỗi nguồn MCP có **token riêng** (biến `MCP_TOKENS` của svc-agent) – phân hệ A không thể dùng token của mình gọi phân hệ B.",
-        "Đội nền tảng sinh token (48 ký tự ngẫu nhiên) và bàn giao qua kênh an toàn; phân hệ lưu trong k8s Secret (`MCP_AGENT_TOKEN`).",
+        "Mỗi nguồn MCP có **token riêng** – phân hệ A không thể dùng token của mình gọi phân hệ B.",
+        "Token sinh tự động khi quản trị nền tảng thêm nguồn trên HRM (tab **Nguồn MCP**), hiển thị **một lần**, bàn giao qua "
+        "kênh an toàn; phân hệ lưu trong k8s Secret (`MCP_AGENT_TOKEN`), không commit, không log.",
         "Thiếu cấu hình token → `/mcp` trả **503** (fail-closed), không được mặc định cho qua.",
         "Xoay token: phân hệ chấp nhận tạm 2 giá trị (cũ + mới) trong thời gian chuyển đổi.",
     ])
