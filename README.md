@@ -36,4 +36,5 @@ svc-hrm local trỏ tới: `AGENT_URL=http://127.0.0.1:8100 AGENT_SERVICE_TOKEN=
 | `LLM_TIMEOUT_SECONDS` / `MCP_TIMEOUT_SECONDS` / `TOOLS_CACHE_SECONDS` | Timeout / cache tools/list theo người dùng |
 
 ## Docker / k8s
-`Dockerfile` (python 3.12-slim, non-root, gunicorn+uvicorn). Manifest + script: `DNS/k8s/k8s-svc-agent/` (`deploy.sh secret|apply|hrm-config|status`).
+`Dockerfile` (python 3.12-slim, non-root, gunicorn+uvicorn). YAML khai báo (kustomize, chung svc-hrm/web-hrm): `DNS/k8s/hrm-platform/` (`deploy.sh diff|apply|tag|status`);
+tạo Secret lần đầu trên cụm mới: `DNS/k8s/k8s-svc-agent/deploy.sh secret`. Biến bắt buộc mới: `CREDENTIAL_KEY` (Secret), `MCP_ALLOWED_HOSTS` (ConfigMap).
