@@ -1,0 +1,12 @@
+{
+  "name": "svc-kho-mcp-sample",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node server.mjs" },
+  "dependencies": {
+    "express": "^5.1.0",
+    "jose": "^5.9.6"
+  }
+}

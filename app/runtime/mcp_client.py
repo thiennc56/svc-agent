@@ -3,7 +3,7 @@
 Mỗi request gửi kèm:
   Authorization: <JWT người hỏi>   → phân hệ kiểm RBAC như REST API của nó
   tenant-id:     <tenant>
-  X-Agent-Token: <service token của app> → phân hệ chỉ nhận lời gọi từ svc-agent
+  X-Agent-Token: <token riêng của nguồn (MCP_TOKENS) | token của app> → phân hệ chỉ nhận lời gọi từ svc-agent
 Chỉ gọi server trong allowlist MCP_SERVERS (theo key), không bao giờ gọi URL do người dùng nhập.
 """
 from __future__ import annotations
@@ -46,6 +46,11 @@ class McpTool:
                 "keywords": self.meta.get("keywords") or []}
 
 
+def agent_token_for(server: str, app: str) -> str:
+    """X-Agent-Token gửi tới MCP server: token riêng của nguồn (MCP_TOKENS) nếu có, không thì token của app."""
+    return settings.mcp_tokens.get(server) or service_token_for(app)
+
+
 def server_meta(server: str) -> dict:
     meta = settings.mcp_servers.get(server)
     if meta is None:
@@ -64,7 +69,7 @@ async def _rpc(server: str, app: str, auth: UserAuth, method: str, params: dict 
         "MCP-Protocol-Version": PROTOCOL_VERSION,
         "Authorization": auth.authorization,
         "tenant-id": auth.tenant_id,
-        "X-Agent-Token": service_token_for(app),
+        "X-Agent-Token": agent_token_for(server, app),
         "X-Agent-App": app,
     }
     body = {"jsonrpc": "2.0", "id": next(_ids), "method": method, "params": params or {}}

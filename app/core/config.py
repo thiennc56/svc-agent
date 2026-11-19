@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # Danh sách MCP server ĐƯỢC PHÉP gọi (allowlist – flow chỉ tham chiếu theo key, không nhập URL tuỳ ý):
     # {"hrm": {"url": "http://svc-hrm:8000/mcp", "title": "HRM – Nhân sự", "apps": ["hrm"], "icon": "pi pi-users"}}
     mcp_servers: dict[str, dict] = Field(default_factory=dict, validation_alias="MCP_SERVERS")
+    # Token RIÊNG cho từng MCP server (k8s Secret): {"crm": "<token>", "kho": "<token>"} → gửi làm X-Agent-Token.
+    # Nguồn không có ở đây dùng token của app gọi (SERVICE_TOKENS[app]) – tương thích svc-hrm hiện tại.
+    # Bắt buộc với phân hệ ngoài HRM: không bao giờ để phân hệ A nhận token dùng để gọi phân hệ B.
+    mcp_tokens: dict[str, str] = Field(default_factory=dict, validation_alias="MCP_TOKENS")
 
     llm_timeout_seconds: float = Field(default=120.0, ge=1, validation_alias="LLM_TIMEOUT_SECONDS")
     mcp_timeout_seconds: float = Field(default=20.0, ge=1, validation_alias="MCP_TIMEOUT_SECONDS")
